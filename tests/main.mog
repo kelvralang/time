@@ -1,0 +1,5 @@
+const time = @import("github.com/moglang/time")
+var before i64 = time.monotonicMillis()
+time.sleepMillis(1)
+if (time.monotonicMillis() < before) error("monotonic clock moved backwards")
+if (time.unixMillis() <= 0) error("unix clock is positive")

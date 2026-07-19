@@ -1,0 +1,4 @@
+package time
+fn monotonicMillis() i64
+fn unixMillis() i64
+fn sleepMillis(milliseconds i64) void
