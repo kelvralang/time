@@ -1,4 +1,7 @@
 package time
 fn monotonicMillis() i64
+fn monotonicNanos() i64
 fn unixMillis() i64
+fn unixSeconds() i64
 fn sleepMillis(milliseconds i64) void
+fn sleepSeconds(seconds i64) void
