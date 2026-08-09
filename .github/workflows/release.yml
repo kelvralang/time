@@ -3,130 +3,19 @@ name: Release native artifacts
 on:
   push:
     tags: ["v*"]
-  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  build:
-    name: Build (${{ matrix.target }})
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: ubuntu-latest
-            target: linux-x86_64-gnu
-          - runner: ubuntu-24.04-arm
-            target: linux-arm64-gnu
-          - runner: macos-14
-            target: macos-arm64
-    env:
-      PACKAGE_NAME: "time"
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          repository: moglang/mog
-          ref: main
-          path: .runtime/mog
-      - name: Install system dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ "$PACKAGE_NAME" == "window" && "$RUNNER_OS" == "Linux" ]]; then
-            sudo apt-get update
-            sudo apt-get install -y libsdl2-dev
-          elif [[ "$PACKAGE_NAME" == "window" && "$RUNNER_OS" == "macOS" ]]; then
-            brew install sdl2
-          fi
-      - name: Verify tag and manifest version
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' mog.toml | head -n 1)"
-          test -n "$version"
-          grep -Fq "## $version" CHANGELOG.md
-          grep -Fq '"${{ matrix.target }}"' mog.toml
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            test "${GITHUB_REF_NAME#v}" = "$version"
-          fi
-      - name: Build package
-        run: |
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-Wall -Wextra -Wpedantic"
-          cmake --build build --config Release --parallel
-      - name: Build Mog runtime
-        run: |
-          cmake -S .runtime/mog -B .runtime/mog/build -DCMAKE_BUILD_TYPE=Release
-          cmake --build .runtime/mog/build --parallel
-      - name: Validate package and run tests
-        shell: bash
-        env:
-          SDL_VIDEODRIVER: dummy
-        run: |
-          set -euo pipefail
-          runtime="$GITHUB_WORKSPACE/.runtime/mog/build/interpreter"
-          version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' mog.toml | head -n 1)"
-          stage="$RUNNER_TEMP/stage/github.com/moglang/$PACKAGE_NAME"
-          mkdir -p "$(dirname "$stage")"
-          rsync -a --exclude .git --exclude .runtime --exclude build "$GITHUB_WORKSPACE/" "$stage/"
-          if [[ "$RUNNER_OS" == "macOS" ]]; then
-            cp build/package.so "$stage/package.dylib"
-          else
-            cp build/package.so "$stage/package.so"
-          fi
-          "$runtime" validate-package "$stage"
-          project="$RUNNER_TEMP/package-test"
-          mkdir -p "$project"
-          sed -e "s|__PACKAGE_NAME__|$PACKAGE_NAME|g" -e "s|__PACKAGE_VERSION__|$version|g" -e "s|__PACKAGE_PATH__|$stage|g" \
-            "$GITHUB_WORKSPACE/.github/package-test.toml.in" > "$project/mog.toml"
-          (
-            cd "$project"
-            MOG_CACHE_DIR="$RUNNER_TEMP/mog-cache" "$runtime" run "$stage/tests/main.mog"
-          )
-      - name: Bundle native artifact
-        shell: bash
-        run: |
-          set -euo pipefail
-          bundle="dist/${{ matrix.target }}"
-          mkdir -p "$bundle"
-          cp mog.toml package.api.mog LICENSE README.md CHANGELOG.md "$bundle/"
-          if [[ "$RUNNER_OS" == "Linux" ]]; then
-            cp build/package.so "$bundle/package.so"
-          else
-            cp build/package.so "$bundle/package.dylib"
-          fi
-          tar -C dist -czf "$PACKAGE_NAME-${{ matrix.target }}.tar.gz" "${{ matrix.target }}"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: time-${{ matrix.target }}
-          path: time-${{ matrix.target }}.tar.gz
-          if-no-files-found: error
-
   release:
-    name: Publish GitHub Release assets
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          path: dist
-          merge-multiple: true
-      - name: Generate checksums
-        run: sha256sum dist/*.tar.gz > dist/SHA256SUMS
-      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
-        with:
-          files: |
-            dist/*.tar.gz
-            dist/SHA256SUMS
-          fail_on_unmatched_files: true
+    uses: moglang/package-actions/.github/workflows/native-release.yml@v1
+    with:
+      package_name: time
+      runtime_ref: main
+      targets: '["linux-x86_64-gnu","linux-arm64-gnu","macos-arm64"]'
+      artifact_path: package.so

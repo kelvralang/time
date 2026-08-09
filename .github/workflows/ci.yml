@@ -14,106 +14,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  compatibility:
-    name: ${{ matrix.target }} / Mog ${{ matrix.runtime_ref }}
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 25
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: ubuntu-latest
-            target: linux-x86_64-gnu
-            runtime_ref: v0.1.4
-          - runner: ubuntu-latest
-            target: linux-x86_64-gnu
-            runtime_ref: main
-          - runner: ubuntu-24.04-arm
-            target: linux-arm64-gnu
-            runtime_ref: main
-          - runner: macos-14
-            target: macos-arm64
-            runtime_ref: main
-    env:
-      PACKAGE_NAME: "time"
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          repository: moglang/mog
-          ref: ${{ matrix.runtime_ref }}
-          path: .runtime/mog
-      - name: Install system dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ "$PACKAGE_NAME" == "window" && "$RUNNER_OS" == "Linux" ]]; then
-            sudo apt-get update
-            sudo apt-get install -y libsdl2-dev
-          elif [[ "$PACKAGE_NAME" == "window" && "$RUNNER_OS" == "macOS" ]]; then
-            brew install sdl2
-          fi
-      - name: Verify release metadata
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' mog.toml | head -n 1)"
-          license="$(sed -n 's/^license = "\([^"]*\)"/\1/p' mog.toml | head -n 1)"
-          test -n "$version"
-          test -f LICENSE
-          test -f package.api.mog
-          test -f tests/main.mog
-          grep -Fq "## $version" CHANGELOG.md
-          grep -q '^```mog' README.md
-          grep -Fq '"${{ matrix.target }}"' mog.toml
-          case "$license" in
-            GPL-3.0-only) grep -Fq "GNU GENERAL PUBLIC LICENSE" LICENSE ;;
-            MIT) grep -Fq "MIT License" LICENSE ;;
-            *) echo "Unsupported or unchecked license declaration: $license" >&2; exit 1 ;;
-          esac
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            test "${GITHUB_REF_NAME#v}" = "$version"
-          fi
-      - name: Build Mog runtime
-        run: |
-          cmake -S .runtime/mog -B .runtime/mog/build -DCMAKE_BUILD_TYPE=Release
-          cmake --build .runtime/mog/build --parallel
-      - name: Build, validate, and test package
-        shell: bash
-        env:
-          SDL_VIDEODRIVER: dummy
-        run: |
-          set -euo pipefail
-          runtime="$GITHUB_WORKSPACE/.runtime/mog/build/interpreter"
-          version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' mog.toml | head -n 1)"
-          stage="$RUNNER_TEMP/github.com/moglang/$PACKAGE_NAME"
-          mkdir -p "$(dirname "$stage")"
-          rsync -a --exclude .git --exclude .runtime --exclude build "$GITHUB_WORKSPACE/" "$stage/"
-          cmake -S "$stage" -B "$stage/build" -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CXX_FLAGS="-Wall -Wextra -Wpedantic"
-          cmake --build "$stage/build" --parallel
-          if [[ "$RUNNER_OS" == "macOS" ]]; then
-            cp "$stage/build/package.so" "$stage/package.dylib"
-          else
-            cp "$stage/build/package.so" "$stage/package.so"
-          fi
-          "$runtime" validate-package "$stage"
-          project="$RUNNER_TEMP/package-test"
-          mkdir -p "$project"
-          sed -e "s|__PACKAGE_NAME__|$PACKAGE_NAME|g" -e "s|__PACKAGE_VERSION__|$version|g" -e "s|__PACKAGE_PATH__|$stage|g" \
-            "$GITHUB_WORKSPACE/.github/package-test.toml.in" > "$project/mog.toml"
-          (
-            cd "$project"
-            MOG_CACHE_DIR="$RUNNER_TEMP/mog-cache" "$runtime" run "$stage/tests/main.mog"
-          )
+  minimum-runtime:
+    uses: moglang/package-actions/.github/workflows/native-ci.yml@v1
+    with:
+      package_name: time
+      runtime_ref: v0.1.4
+      targets: '["linux-x86_64-gnu"]'
 
-  validate:
-    if: always()
-    needs: compatibility
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    steps:
-      - name: Require compatibility matrix
-        env:
-          RESULT: ${{ needs.compatibility.result }}
-        run: test "$RESULT" = success
+  current-runtime:
+    uses: moglang/package-actions/.github/workflows/native-ci.yml@v1
+    with:
+      package_name: time
+      runtime_ref: main
+      targets: '["linux-x86_64-gnu","linux-arm64-gnu","macos-arm64"]'
