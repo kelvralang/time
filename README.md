@@ -1,18 +1,18 @@
-# moglang/time
+# kelvralang/time
 
-Clock and sleep utilities for Mog. The canonical import is
-`github.com/moglang/time`. This native package supports ABI 3 and Mog runtime
-`^0.1.4` on Linux x86_64, Linux ARM64, and macOS ARM64.
+Clock and sleep utilities for Kelvra. The canonical import is
+`github.com/kelvralang/time`. This native package supports ABI 3 and Kelvra runtime
+`^0.2.0` on Linux x86_64, Linux ARM64, and macOS ARM64.
 
-Install from a Mog project directory. Git dependencies build from source and
+Install from a Kelvra project directory. Git dependencies build from source and
 therefore require CMake and a C++17 compiler:
 
 ```bash
-mog add github.com/moglang/time@v0.1.2
+kelvra add github.com/kelvralang/time@v0.2.0
 ```
 
-```mog
-const time = @import("github.com/moglang/time")
+```kelvra
+const time = @import("github.com/kelvralang/time")
 
 var started i64 = time.monotonicMillis()
 time.sleepMillis(10)
@@ -31,5 +31,5 @@ Operating-system scheduling means the actual delay can be longer than requested.
 Duration objects, deadlines, timers, formatting, calendars, and timezone support
 are outside this package's current scope.
 
-Build with CMake. The complete public contract is in `package.api.mog`. The
+Build with CMake. The complete public contract is in `package.api.kel`. The
 package is licensed under GPL-3.0-only; see `LICENSE`.

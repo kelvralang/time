@@ -1,4 +1,4 @@
-const time = @import("github.com/moglang/time")
+const time = @import("github.com/kelvralang/time")
 var beforeMillis i64 = time.monotonicMillis()
 var beforeNanos i64 = time.monotonicNanos()
 time.sleepMillis(1)

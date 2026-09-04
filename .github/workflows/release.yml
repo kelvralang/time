@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   release:
-    uses: moglang/package-actions/.github/workflows/native-release.yml@v1
+    uses: kelvralang/package-actions/.github/workflows/native-release.yml@v2
     with:
       package_name: time
       runtime_ref: main
