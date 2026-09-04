@@ -14,15 +14,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  minimum-runtime:
-    uses: moglang/package-actions/.github/workflows/native-ci.yml@v1
-    with:
-      package_name: time
-      runtime_ref: v0.1.4
-      targets: '["linux-x86_64-gnu"]'
-
   current-runtime:
-    uses: moglang/package-actions/.github/workflows/native-ci.yml@v1
+    uses: kelvralang/package-actions/.github/workflows/native-ci.yml@v2
     with:
       package_name: time
       runtime_ref: main
